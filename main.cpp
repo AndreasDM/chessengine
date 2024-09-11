@@ -12,7 +12,7 @@
 #include <benchmark/benchmark.h>
 #include <numeric>
 // #define TESTS 1
-#define BENCH 1
+// #define BENCH 1
 
 #ifdef TESTS
 #define CATCH_CONFIG_MAIN
@@ -2065,43 +2065,32 @@ int negamax(int depth, Board board)
 
     int max = std::numeric_limits<int>::min();
 
-    int score= max;
-
     auto moves = generate_moves(board);
-    if (moves.size() == 0) {
-        auto f = evaluation(board);
-        fmt::print("f: {}\n", f);
-        return f;
-    }
     for (auto move : moves) {
         auto foo = make_move(move, board);
-        if (!is_in_check_turn(foo, board.turn)) {
-            score = -negamax(depth - 1, foo);
-            if (score > max) {
-                max = score;
-            }
+        int score = -negamax(depth - 1, foo);
+        if (score > max) {
+            max = score;
         }
-
     }
 
-    return score;
+    return max;
 }
 
-Move think(Board board)
+Move think(Board board, int depth)
 {
     auto moves = generate_moves(board);
     Move m;
 
     int best_eval = std::numeric_limits<int>::min();
-    for (auto move : moves) {
-        if (auto foo = make_move(move, board); !is_in_check_turn(foo, board.turn)) {
-            int eval_move = -negamax(4, foo);
 
-            if (eval_move > best_eval) {
-                fmt::print("eval: {}\n", eval_move);
-                m = move;
-                best_eval = eval_move;
-            }
+    for (auto move : moves) {
+        auto foo = make_move(move, board);
+        int eval_move = -negamax(depth - 1, foo);
+
+        if (eval_move > best_eval) {
+            m = move;
+            best_eval = eval_move;
         }
     }
 
@@ -3260,11 +3249,11 @@ BENCHMARK_MAIN();
 
 int main()
 {
-    std::string fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq";
+    // std::string fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq";
     // std::string fen = "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - ";
 
-    auto board = parse_fen(fen);
-    // auto board = start_position();
+    // auto board = parse_fen(fen);
+    auto board = start_position();
     print_board(board);
 
     // fmt::print("turn: {}\n", board.turn == Turn::white);
@@ -3278,10 +3267,6 @@ int main()
     //         fmt::print("{}{}\n", square_to_str[move.from], square_to_str[move.to]);
     //     }
     // }
-
-
-    fmt::print("{}\n", perft(5, board, 5));
-    return 0;
 
     std::string m;
 
@@ -3314,7 +3299,7 @@ int main()
             fmt::print("en passant square: {}\n", foo);
         }
         print_board(board);
-        auto mo = think(board);
+        auto mo = think(board, 4);
         fmt::print("move: {}{}\n", square_to_str[mo.from], square_to_str[mo.to]);
     }
 }
