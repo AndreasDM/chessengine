@@ -1969,16 +1969,19 @@ int negamax(int depth, Board board)
     int max = std::numeric_limits<int>::min();
 
     auto moves = generate_moves(board);
-    if (moves.size() == 0) {
-        return evaluation(board) * 999;
-    }
+    bool has_moves = false;
     for (auto move : moves) {
-        auto foo = make_move(move, board);
-        int score = -negamax(depth - 1, foo);
-        if (score > max) {
-            max = score;
+        if (auto foo = make_move(move, board); !is_in_check_turn(foo, board.turn)) {
+            has_moves = true;
+            int score = -negamax(depth - 1, foo);
+            if (score > max) {
+                max = score;
+            }
         }
     }
+
+    if (!has_moves)
+        return -999999;
 
     return max;
 }
@@ -1991,12 +1994,13 @@ Move think(Board board, int depth)
     int best_eval = std::numeric_limits<int>::min();
 
     for (auto move : moves) {
-        auto foo = make_move(move, board);
-        int eval_move = -negamax(depth - 1, foo);
+        if (auto foo = make_move(move, board); !is_in_check_turn(foo, board.turn)) {
+            int eval_move = -negamax(depth - 1, foo);
 
-        if (eval_move > best_eval) {
-            m = move;
-            best_eval = eval_move;
+            if (eval_move > best_eval) {
+                m = move;
+                best_eval = eval_move;
+            }
         }
     }
 
