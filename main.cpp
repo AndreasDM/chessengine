@@ -1470,9 +1470,9 @@ struct MoveList {
 MoveList generate_moves(const Board & board) noexcept
 {
     MoveList ret;
-    auto black = black_pieces(board);
+    auto black  = black_pieces(board);
     auto emptys = empty_b(board);
-    auto white = white_pieces(board);
+    auto white  = white_pieces(board);
 
     if (board.turn == Turn::white) {
         // Start with all pawns that can push a single square
@@ -1579,7 +1579,7 @@ MoveList generate_moves(const Board & board) noexcept
                 }
 
                 rooks = rooks &~ (1UL << idx);
-                idx     = __builtin_ctzll(rooks);
+                idx   = __builtin_ctzll(rooks);
             }
         }
 
@@ -1596,7 +1596,7 @@ MoveList generate_moves(const Board & board) noexcept
                 }
 
                 queens = queens &~ (1UL << idx);
-                idx     = __builtin_ctzll(queens);
+                idx    = __builtin_ctzll(queens);
             }
         }
 
@@ -2068,9 +2068,11 @@ int negamax(int depth, Board board)
     auto moves = generate_moves(board);
     for (auto move : moves) {
         auto foo = make_move(move, board);
-        int score = -negamax(depth - 1, foo);
-        if (score > max) {
-            max = score;
+        if (!is_in_check_turn(foo, board.turn)) {
+            int score = -negamax(depth - 1, foo);
+            if (score > max) {
+                max = score;
+            }
         }
     }
 
@@ -2086,11 +2088,13 @@ Move think(Board board, int depth)
 
     for (auto move : moves) {
         auto foo = make_move(move, board);
-        int eval_move = -negamax(depth - 1, foo);
+        if (!is_in_check_turn(foo, board.turn)) {
+            int eval_move = -negamax(depth - 1, foo);
 
-        if (eval_move > best_eval) {
-            m = move;
-            best_eval = eval_move;
+            if (eval_move > best_eval) {
+                m = move;
+                best_eval = eval_move;
+            }
         }
     }
 
@@ -3216,6 +3220,7 @@ TEST_CASE("fen parser")
     std::string fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq";
     auto board = parse_fen(fen);
 }
+
 #endif
 
 
@@ -3249,59 +3254,127 @@ BENCHMARK_MAIN();
 
 int main()
 {
-    // std::string fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq";
-    // std::string fen = "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - ";
+    bool running = true;
 
-    // auto board = parse_fen(fen);
     auto board = start_position();
-    print_board(board);
+    Move best_move{};
 
-    // fmt::print("turn: {}\n", board.turn == Turn::white);
+    std::string line;
+    while (running) {
+        std::getline(std::cin, line);
+        std::stringstream iss(line);
+        std::string in;
+        iss >> in;
+        if (in.compare("uci") == 0) {
+            fmt::print("id name Foobar\nid author Andreas\n");
+            fmt::print("uciok\n");
+        } else if (in.compare("quit") == 0) {
+            running = false;
+        } else if (in.compare("isready") == 0) {
+            fmt::print("readyok\n");
+        } else if (in.compare("ucinewgame") == 0) {
+            board = start_position();
+        } else if (in.compare("position") == 0) {
+            if (iss >> in) {
+                if (in.compare("startpos") == 0) {
+                    board = start_position();
+                    if (iss >> in && in.compare("moves") == 0) {
+                        std::string to_move;
+                        while (iss >> to_move) {
+                            int from = move_key[to_move.substr(0, 2)];
+                            int to   = move_key[to_move.substr(2, 2)];
 
-    // auto bar = make_move({f3,g2}, board);
+                            char promo = 'q';
+                            if (to_move.length() == 5) {
+                                promo = to_move.substr(4, 1)[0];
+                            }
 
-    // print_board(bar);
+                            int prom = Promo_none;
+                            if (promo == 'q')
+                                prom = Promo_queen;
+                            if (promo == 'r')
+                                prom = Promo_rook;
+                            if (promo == 'b')
+                                prom = Promo_bishop;
+                            if (promo == 'n')
+                                prom = Promo_knight;
 
-    // for (auto move : generate_moves(board)) {
-    //     if (auto foo = make_move(move, board); !is_in_check_turn(foo, board.turn)) {
-    //         fmt::print("{}{}\n", square_to_str[move.from], square_to_str[move.to]);
-    //     }
-    // }
-
-    std::string m;
-
-    while (std::cin >> m) {
-        std::cout << m.length() << '\n';
-        if (m.length() < 4 || m.length() > 5)
-            continue;
-
-        int from = move_key[m.substr(0, 2)];
-        int to   = move_key[m.substr(2, 2)];
-
-        char promo = 'q';
-        if (m.length() == 5) {
-            promo = m.substr(4, 1)[0];
+                            board = make_move({print_mapping[from], print_mapping[to], prom}, board);
+                        }
+                    }
+                }
+            }
+        } else if (in.compare("go") == 0) {
+            best_move = think(board, 5);
+            fmt::print("bestmove {}{}\n", square_to_str[best_move.from], square_to_str[best_move.to]);
+        } else if (in.compare("stop") == 0) {
+            fmt::print("bestmove {}{}\n", square_to_str[best_move.from], square_to_str[best_move.to]);
+        } else if (in.compare("print") == 0) {
+            print_board(board);
         }
 
-        int prom = Promo_none;
-        if (promo == 'q')
-            prom = Promo_queen;
-        if (promo == 'r')
-            prom = Promo_rook;
-        if (promo == 'b')
-            prom = Promo_bishop;
-        if (promo == 'n')
-            prom = Promo_knight;
-
-        board = make_move({print_mapping[from], print_mapping[to], prom}, board);
-        if (board.en_passant) {
-            auto foo = __builtin_ctzll(board.en_passant);
-            fmt::print("en passant square: {}\n", foo);
-        }
-        print_board(board);
-        auto mo = think(board, 4);
-        fmt::print("move: {}{}\n", square_to_str[mo.from], square_to_str[mo.to]);
     }
+
+    return 0;
 }
+
+// int main()
+// {
+//     // std::string fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq";
+//     // std::string fen = "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - ";
+
+//     // auto board = parse_fen(fen);
+//     auto board = start_position();
+//     print_board(board);
+
+//     // fmt::print("turn: {}\n", board.turn == Turn::white);
+
+//     // auto bar = make_move({f3,g2}, board);
+
+//     // print_board(bar);
+
+//     // for (auto move : generate_moves(board)) {
+//     //     if (auto foo = make_move(move, board); !is_in_check_turn(foo, board.turn)) {
+//     //         fmt::print("{}{}\n", square_to_str[move.from], square_to_str[move.to]);
+//     //     }
+//     // }
+
+//     std::string m;
+
+//     while (std::cin >> m) {
+//         std::cout << m.length() << '\n';
+//         if (m.length() < 4 || m.length() > 5)
+//             continue;
+
+//         int from = move_key[m.substr(0, 2)];
+//         int to   = move_key[m.substr(2, 2)];
+
+//         char promo = 'q';
+//         if (m.length() == 5) {
+//             promo = m.substr(4, 1)[0];
+//         }
+
+//         int prom = Promo_none;
+//         if (promo == 'q')
+//             prom = Promo_queen;
+//         if (promo == 'r')
+//             prom = Promo_rook;
+//         if (promo == 'b')
+//             prom = Promo_bishop;
+//         if (promo == 'n')
+//             prom = Promo_knight;
+
+//         board = make_move({print_mapping[from], print_mapping[to], prom}, board);
+//         if (board.en_passant) {
+//             auto foo = __builtin_ctzll(board.en_passant);
+//             fmt::print("en passant square: {}\n", foo);
+//         }
+//         print_board(board);
+//         auto mo = think(board, 4);
+//         fmt::print("move: {}{}\n", square_to_str[mo.from], square_to_str[mo.to]);
+//         board = make_move(mo, board);
+//         print_board(board);
+//     }
+// }
 
 #endif
