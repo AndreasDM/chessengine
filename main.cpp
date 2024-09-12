@@ -1893,7 +1893,7 @@ Board parse_fen(std::string fen)
 
 constexpr inline auto evaluation(Board board)
 {
-    auto material = 500 * (__builtin_popcountll(board.white_king) - __builtin_popcountll(board.black_king))
+    auto material = 9500 * (__builtin_popcountll(board.white_king) - __builtin_popcountll(board.black_king))
                   + 900 * (__builtin_popcountll(board.white_queens) - __builtin_popcountll(board.black_queens))
                   + 500 * (__builtin_popcountll(board.white_rooks) - __builtin_popcountll(board.black_rooks))
                   + 300 * (__builtin_popcountll(board.white_bishops) - __builtin_popcountll(board.black_bishops))
@@ -1969,13 +1969,14 @@ int negamax(int depth, Board board)
     int max = std::numeric_limits<int>::min();
 
     auto moves = generate_moves(board);
+    if (moves.size() == 0) {
+        return evaluation(board) * 999;
+    }
     for (auto move : moves) {
         auto foo = make_move(move, board);
-        if (!is_in_check_turn(foo, board.turn)) {
-            int score = -negamax(depth - 1, foo);
-            if (score > max) {
-                max = score;
-            }
+        int score = -negamax(depth - 1, foo);
+        if (score > max) {
+            max = score;
         }
     }
 
@@ -1991,13 +1992,11 @@ Move think(Board board, int depth)
 
     for (auto move : moves) {
         auto foo = make_move(move, board);
-        if (!is_in_check_turn(foo, board.turn)) {
-            int eval_move = -negamax(depth - 1, foo);
+        int eval_move = -negamax(depth - 1, foo);
 
-            if (eval_move > best_eval) {
-                m = move;
-                best_eval = eval_move;
-            }
+        if (eval_move > best_eval) {
+            m = move;
+            best_eval = eval_move;
         }
     }
 
