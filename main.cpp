@@ -3123,6 +3123,30 @@ TEST_CASE("Finds checkmate: rnb1k1nr/pppp1ppp/5q2/2b1p3/2B1P3/2N5/PPPP1PPP/R1BQK
     CHECK_THAT(square_to_str[move.to], Catch::Equals("f2"));
 }
 
+TEST_CASE("perft4_kiwipete", "[.]")
+{
+    std::string fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq";
+    auto board = parse_fen(fen);
+
+    CHECK(perft(4, board, 4) == 4085603);
+}
+
+TEST_CASE("perft5_kiwipete", "[.]")
+{
+    std::string fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq";
+    auto board = parse_fen(fen);
+
+    CHECK(perft(5, board, 5) == 193690690);
+}
+
+TEST_CASE("perft6_kiwipete", "[.]")
+{
+    std::string fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq";
+    auto board = parse_fen(fen);
+
+    CHECK(perft(6, board, 6) == 8031647685);
+}
+
 #endif
 
 
