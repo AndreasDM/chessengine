@@ -147,72 +147,6 @@ constexpr u64 pawn_moves[2][64] = {{0x200,
                                     0x40000000000000,
                                     0x80000000000000,
                                     0x0},
-
-                                   // {0x40000000000000,
-                                   //  0x20000000000000,
-                                   //  0x10000000000000,
-                                   //  0x8000000000000,
-                                   //  0x4000000000000,
-                                   //  0x2000000000000,
-                                   //  0x1000000000000,
-                                   //  0x0,
-                                   //  0x4000400000000000,
-                                   //  0x2000200000000000,
-                                   //  0x1000100000000000,
-                                   //  0x800080000000000,
-                                   //  0x400040000000000,
-                                   //  0x200020000000000,
-                                   //  0x100010000000000,
-                                   //  0x0,
-                                   //  0x40004000000000,
-                                   //  0x20002000000000,
-                                   //  0x10001000000000,
-                                   //  0x8000800000000,
-                                   //  0x4000400000000,
-                                   //  0x2000200000000,
-                                   //  0x1000100000000,
-                                   //  0x0,
-                                   //  0x400040000000,
-                                   //  0x200020000000,
-                                   //  0x100010000000,
-                                   //  0x80008000000,
-                                   //  0x40004000000,
-                                   //  0x20002000000,
-                                   //  0x10001000000,
-                                   //  0x0,
-                                   //  0x4000400000,
-                                   //  0x2000200000,
-                                   //  0x1000100000,
-                                   //  0x800080000,
-                                   //  0x400040000,
-                                   //  0x200020000,
-                                   //  0x100010000,
-                                   //  0x0,
-                                   //  0x40004000,
-                                   //  0x20002000,
-                                   //  0x10001000,
-                                   //  0x8000800,
-                                   //  0x4000400,
-                                   //  0x2000200,
-                                   //  0x1000100,
-                                   //  0x0,
-                                   //  0x400040,
-                                   //  0x200020,
-                                   //  0x100010,
-                                   //  0x80008,
-                                   //  0x40004,
-                                   //  0x20002,
-                                   //  0x10001,
-                                   //  0x0,
-                                   //  0x4000,
-                                   //  0x2000,
-                                   //  0x1000,
-                                   //  0x800,
-                                   //  0x400,
-                                   //  0x200,
-                                   //  0x100,
-                                   //  0x0}};
-
                                    {0x0,
                                     0x100,
                                     0x200,
@@ -1314,14 +1248,6 @@ constexpr inline auto make_move(Move move, Board board) noexcept
 {
     auto piece_type = piece_type_on_idx(board, move.from);
 
-    // if (!is_pseudo_legal(piece_type, move, board)) {
-    //     fmt::print("not legal\n");
-    //     // std::cout << "not legal\n";
-    //     return board;
-    // }
-
-    // auto old_board = board;
-
     // If previous move had en_passant enabled AND
     // If this move is a pawn move, AND
     // If this move hits the en_passant square THEN
@@ -1433,9 +1359,6 @@ constexpr inline auto make_move(Move move, Board board) noexcept
         if (move.promote == Promo_bishop)
             updated_board.black_bishops = updated_board.black_bishops | (1UL << move.to);
     }
-
-    // if (is_in_check(updated_board))
-    //     return old_board;
 
     updated_board = swap_turn(updated_board);
 
@@ -1567,10 +1490,8 @@ MoveList generate_moves(const Board & board) noexcept
         {
             auto rooks = board.white_rooks;
             auto idx     = __builtin_ctzll(rooks);
-            // fmt::print("rook idx: {}\n", idx);
             while (rooks) {
                 auto attacks_to = filter_attack_rays(attack_rays_rook(idx, board), board, board.turn);
-                // print(attacks_to);
                 auto idx_attack = __builtin_ctzll(attacks_to);
                 while (attacks_to) {
                     ret.push_back({idx, idx_attack});
@@ -1806,29 +1727,18 @@ std::array<const char*, 64> square_to_str {
 
 constexpr u64 perft(int depth, const Board & board, int print_at) noexcept
 {
-    // if (depth == 1)
-    //     return generate_moves(board).size();
-
-    if (depth == 0) {
-        // if (depth == print_at) {
-        //     for (auto move : generate_moves(board))
-        //         fmt::print("{}{}: nodes: {}\n", square_to_str[move.from], square_to_str[move.to], 1);
-        // }
-
-        // return generate_moves(board).size();
+    if (depth == 0)
         return 1ULL;
-    }
 
     auto nodes = 0ULL;
 
     for (auto move : generate_moves(board)) {
         auto inner_node = 0ULL;
-        // auto foo = make_move(move, board);
         if (auto foo = make_move(move, board); !is_in_check_turn(foo, board.turn))
             inner_node += perft(depth - 1, foo, print_at);
 
-        if (depth == print_at && inner_node != 0)
-            fmt::print("{}{}: nodes: {}\n", square_to_str[move.from], square_to_str[move.to], inner_node);
+        // if (depth == print_at && inner_node != 0)
+        //     fmt::print("{}{}: nodes: {}\n", square_to_str[move.from], square_to_str[move.to], inner_node);
         nodes += inner_node;
     }
 
@@ -2102,14 +2012,6 @@ Move think(Board board, int depth)
 }
 
 #if TESTS
-
-// TEST_CASE("negamax depth 2")
-// {
-//     std::string fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq";
-//     auto board = parse_fen(fen);
-
-//     negamax<5>(5, board);
-// }
 
 TEST_CASE("attack ray north from b2-a8")
 {
@@ -3128,7 +3030,6 @@ TEST_CASE("Legal moves from start position a2")
     auto w = white_pieces(board);
     // Find index of first bit
     auto idx = __builtin_ctzll(w);
-    // fmt::print("{}\n", idx);
 
     auto type = piece_type_on_idx(board, idx);
     REQUIRE(type == Rook);
@@ -3141,7 +3042,6 @@ TEST_CASE("Legal moves from start position a2")
 
     // Get index of next bit
     idx = __builtin_ctzll(w);
-    // fmt::print("{}\n", idx);
 
     // Get the piece type on index
     type = piece_type_on_idx(board, idx);
@@ -3156,7 +3056,6 @@ TEST_CASE("Legal moves from start position a2")
 
     w = w&~ (1UL<< idx);
     idx = __builtin_ctzll(w);
-    // fmt::print("{}\n", idx);
 
     type = piece_type_on_idx(board, idx);
     REQUIRE(type == Knight);
@@ -3164,7 +3063,6 @@ TEST_CASE("Legal moves from start position a2")
     rays = __builtin_popcountll(filter_attack_rays(knight_moves[idx], board, board.turn));
 
     REQUIRE(rays == 2);
-
 }
 
 TEST_CASE("White is in check")
@@ -3197,6 +3095,7 @@ TEST_CASE("Legal moves white from start position")
     REQUIRE(num_legal_moves(board) == 27);
 }
 
+// TODO ASSERT correctness
 TEST_CASE("prmote to queen")
 {
     Board board = start_position();
@@ -3215,6 +3114,7 @@ TEST_CASE("prmote to queen")
     // print_board(board);
 }
 
+// TODO ASSERT correctness
 TEST_CASE("fen parser")
 {
     std::string fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq";
@@ -3317,64 +3217,5 @@ int main()
 
     return 0;
 }
-
-// int main()
-// {
-//     // std::string fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq";
-//     // std::string fen = "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - ";
-
-//     // auto board = parse_fen(fen);
-//     auto board = start_position();
-//     print_board(board);
-
-//     // fmt::print("turn: {}\n", board.turn == Turn::white);
-
-//     // auto bar = make_move({f3,g2}, board);
-
-//     // print_board(bar);
-
-//     // for (auto move : generate_moves(board)) {
-//     //     if (auto foo = make_move(move, board); !is_in_check_turn(foo, board.turn)) {
-//     //         fmt::print("{}{}\n", square_to_str[move.from], square_to_str[move.to]);
-//     //     }
-//     // }
-
-//     std::string m;
-
-//     while (std::cin >> m) {
-//         std::cout << m.length() << '\n';
-//         if (m.length() < 4 || m.length() > 5)
-//             continue;
-
-//         int from = move_key[m.substr(0, 2)];
-//         int to   = move_key[m.substr(2, 2)];
-
-//         char promo = 'q';
-//         if (m.length() == 5) {
-//             promo = m.substr(4, 1)[0];
-//         }
-
-//         int prom = Promo_none;
-//         if (promo == 'q')
-//             prom = Promo_queen;
-//         if (promo == 'r')
-//             prom = Promo_rook;
-//         if (promo == 'b')
-//             prom = Promo_bishop;
-//         if (promo == 'n')
-//             prom = Promo_knight;
-
-//         board = make_move({print_mapping[from], print_mapping[to], prom}, board);
-//         if (board.en_passant) {
-//             auto foo = __builtin_ctzll(board.en_passant);
-//             fmt::print("en passant square: {}\n", foo);
-//         }
-//         print_board(board);
-//         auto mo = think(board, 4);
-//         fmt::print("move: {}{}\n", square_to_str[mo.from], square_to_str[mo.to]);
-//         board = make_move(mo, board);
-//         print_board(board);
-//     }
-// }
 
 #endif
