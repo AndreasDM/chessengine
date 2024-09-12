@@ -68,6 +68,7 @@ inline u64 bitscanF (u64 n)
     return __builtin_ctzll(n);
 }
 
+#ifdef DEBUG
 const auto print = [](u64 b) {
     for (int i = 0; i != 64; ++i) {
         if (i != 0 && i % 8 == 0)
@@ -77,6 +78,7 @@ const auto print = [](u64 b) {
     std::cout << '\n';
     std::cout << '\n';
 };
+#endif
 
 enum class Turn {
     white,
@@ -1390,6 +1392,9 @@ struct MoveList {
     std::array<Move, 256> list;
 };
 
+// TODO
+// Push the moves in the order of highest quality.
+// i.e Queen, Rook etc.
 MoveList generate_moves(const Board & board) noexcept
 {
     MoveList ret;
