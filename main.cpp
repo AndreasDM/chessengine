@@ -1392,9 +1392,6 @@ struct MoveList {
     std::array<Move, 256> list;
 };
 
-// TODO
-// Push the moves in the order of highest quality.
-// i.e Queen, Rook etc.
 MoveList generate_moves(const Board & board) noexcept
 {
     MoveList ret;
@@ -1403,6 +1400,72 @@ MoveList generate_moves(const Board & board) noexcept
     auto white  = white_pieces(board);
 
     if (board.turn == Turn::white) {
+        {
+            auto queens = board.white_queens;
+            auto idx     = __builtin_ctzll(queens);
+            while (queens) {
+                auto attacks_to = filter_attack_rays(attack_rays_queen(idx, board), board, board.turn);
+                auto idx_attack = __builtin_ctzll(attacks_to);
+                while (attacks_to) {
+                    ret.push_back({idx, idx_attack});
+                    attacks_to = attacks_to &~ (1UL << idx_attack);
+                    idx_attack = __builtin_ctzll(attacks_to);
+                }
+
+                queens = queens &~ (1UL << idx);
+                idx    = __builtin_ctzll(queens);
+            }
+        }
+        {
+            auto rooks = board.white_rooks;
+            auto idx     = __builtin_ctzll(rooks);
+            while (rooks) {
+                auto attacks_to = filter_attack_rays(attack_rays_rook(idx, board), board, board.turn);
+                auto idx_attack = __builtin_ctzll(attacks_to);
+                while (attacks_to) {
+                    ret.push_back({idx, idx_attack});
+                    attacks_to = attacks_to &~ (1UL << idx_attack);
+                    idx_attack = __builtin_ctzll(attacks_to);
+                }
+
+                rooks = rooks &~ (1UL << idx);
+                idx   = __builtin_ctzll(rooks);
+            }
+        }
+        {
+            auto bishops = board.white_bishops;
+            auto idx     = __builtin_ctzll(bishops);
+            while (bishops) {
+                auto attacks_to = filter_attack_rays(diagonal_attack_rays(idx, board), board, board.turn);
+                auto idx_attack = __builtin_ctzll(attacks_to);
+                while (attacks_to) {
+                    ret.push_back({idx, idx_attack});
+                    attacks_to = attacks_to &~ (1UL << idx_attack);
+                    idx_attack = __builtin_ctzll(attacks_to);
+                }
+
+                bishops = bishops &~ (1UL << idx);
+                idx     = __builtin_ctzll(bishops);
+            }
+        }
+        {
+            auto knights = board.white_knights;
+            auto idx     = __builtin_ctzll(knights);
+            while (knights) {
+                auto attacks_to = knight_moves[idx] & (black ^ emptys);
+                auto idx_attack = __builtin_ctzll(attacks_to);
+                while (attacks_to) {
+                    ret.push_back({idx, idx_attack});
+
+                    attacks_to = attacks_to &~ (1UL << idx_attack);
+                    idx_attack = __builtin_ctzll(attacks_to);
+                }
+
+                knights = knights &~ (1UL << idx);
+                idx     = __builtin_ctzll(knights);
+            }
+        }
+
         // Start with all pawns that can push a single square
         if (auto pawns = w_pawns_able_to_push(board)) {
             auto idx = __builtin_ctzll(pawns);
@@ -1456,76 +1519,6 @@ MoveList generate_moves(const Board & board) noexcept
                 idx   = __builtin_ctzll(pawns);
             }
         }
-
-        {
-            auto knights = board.white_knights;
-            auto idx     = __builtin_ctzll(knights);
-            while (knights) {
-                auto attacks_to = knight_moves[idx] & (black ^ emptys);
-                auto idx_attack = __builtin_ctzll(attacks_to);
-                while (attacks_to) {
-                    ret.push_back({idx, idx_attack});
-
-                    attacks_to = attacks_to &~ (1UL << idx_attack);
-                    idx_attack = __builtin_ctzll(attacks_to);
-                }
-
-                knights = knights &~ (1UL << idx);
-                idx     = __builtin_ctzll(knights);
-            }
-        }
-
-        {
-            auto bishops = board.white_bishops;
-            auto idx     = __builtin_ctzll(bishops);
-            while (bishops) {
-                auto attacks_to = filter_attack_rays(diagonal_attack_rays(idx, board), board, board.turn);
-                auto idx_attack = __builtin_ctzll(attacks_to);
-                while (attacks_to) {
-                    ret.push_back({idx, idx_attack});
-                    attacks_to = attacks_to &~ (1UL << idx_attack);
-                    idx_attack = __builtin_ctzll(attacks_to);
-                }
-
-                bishops = bishops &~ (1UL << idx);
-                idx     = __builtin_ctzll(bishops);
-            }
-        }
-
-        {
-            auto rooks = board.white_rooks;
-            auto idx     = __builtin_ctzll(rooks);
-            while (rooks) {
-                auto attacks_to = filter_attack_rays(attack_rays_rook(idx, board), board, board.turn);
-                auto idx_attack = __builtin_ctzll(attacks_to);
-                while (attacks_to) {
-                    ret.push_back({idx, idx_attack});
-                    attacks_to = attacks_to &~ (1UL << idx_attack);
-                    idx_attack = __builtin_ctzll(attacks_to);
-                }
-
-                rooks = rooks &~ (1UL << idx);
-                idx   = __builtin_ctzll(rooks);
-            }
-        }
-
-        {
-            auto queens = board.white_queens;
-            auto idx     = __builtin_ctzll(queens);
-            while (queens) {
-                auto attacks_to = filter_attack_rays(attack_rays_queen(idx, board), board, board.turn);
-                auto idx_attack = __builtin_ctzll(attacks_to);
-                while (attacks_to) {
-                    ret.push_back({idx, idx_attack});
-                    attacks_to = attacks_to &~ (1UL << idx_attack);
-                    idx_attack = __builtin_ctzll(attacks_to);
-                }
-
-                queens = queens &~ (1UL << idx);
-                idx    = __builtin_ctzll(queens);
-            }
-        }
-
         {
             auto king = board.white_king;
             auto idx = __builtin_ctzll(king);
@@ -1557,9 +1550,74 @@ MoveList generate_moves(const Board & board) noexcept
             }
         }
 
-
     }
     else {
+        {
+            auto queens = board.black_queens;
+            auto idx     = __builtin_ctzll(queens);
+            while (queens) {
+                auto attacks_to = filter_attack_rays(attack_rays_queen(idx, board), board, board.turn);
+                auto idx_attack = __builtin_ctzll(attacks_to);
+                while (attacks_to) {
+                    ret.push_back({idx, idx_attack});
+                    attacks_to = attacks_to &~ (1UL << idx_attack);
+                    idx_attack = __builtin_ctzll(attacks_to);
+                }
+
+                queens = queens &~ (1UL << idx);
+                idx     = __builtin_ctzll(queens);
+            }
+        }
+        {
+            auto rooks = board.black_rooks;
+            auto idx     = __builtin_ctzll(rooks);
+            while (rooks) {
+                auto attacks_to = filter_attack_rays(attack_rays_rook(idx, board), board, board.turn);
+                auto idx_attack = __builtin_ctzll(attacks_to);
+                while (attacks_to) {
+                    ret.push_back({idx, idx_attack});
+                    attacks_to = attacks_to &~ (1UL << idx_attack);
+                    idx_attack = __builtin_ctzll(attacks_to);
+                }
+
+                rooks = rooks &~ (1UL << idx);
+                idx     = __builtin_ctzll(rooks);
+            }
+        }
+        {
+            auto knights = board.black_knights;
+            auto idx     = __builtin_ctzll(knights);
+            while (knights) {
+                auto attacks_to = knight_moves[idx] & (white ^ emptys);
+                auto idx_attack = __builtin_ctzll(attacks_to);
+                while (attacks_to) {
+                    ret.push_back({idx, idx_attack});
+
+                    attacks_to = attacks_to &~ (1UL << idx_attack);
+                    idx_attack = __builtin_ctzll(attacks_to);
+                }
+
+                knights = knights &~ (1UL << idx);
+                idx     = __builtin_ctzll(knights);
+            }
+        }
+        {
+            auto bishops = board.black_bishops;
+            auto idx     = __builtin_ctzll(bishops);
+            while (bishops) {
+                auto attacks_to = filter_attack_rays(diagonal_attack_rays(idx, board), board, board.turn);
+                auto idx_attack = __builtin_ctzll(attacks_to);
+                while (attacks_to) {
+                    ret.push_back({idx, idx_attack});
+                    attacks_to = attacks_to &~ (1UL << idx_attack);
+                    idx_attack = __builtin_ctzll(attacks_to);
+                }
+
+                bishops = bishops &~ (1UL << idx);
+                idx     = __builtin_ctzll(bishops);
+            }
+        }
+
         if (auto pawns = b_pawns_able_to_push(board)) {
             auto idx = __builtin_ctzll(pawns);
             while (pawns) {
@@ -1612,76 +1670,6 @@ MoveList generate_moves(const Board & board) noexcept
                 idx   = __builtin_ctzll(pawns);
             }
         }
-
-        {
-            auto knights = board.black_knights;
-            auto idx     = __builtin_ctzll(knights);
-            while (knights) {
-                auto attacks_to = knight_moves[idx] & (white ^ emptys);
-                auto idx_attack = __builtin_ctzll(attacks_to);
-                while (attacks_to) {
-                    ret.push_back({idx, idx_attack});
-
-                    attacks_to = attacks_to &~ (1UL << idx_attack);
-                    idx_attack = __builtin_ctzll(attacks_to);
-                }
-
-                knights = knights &~ (1UL << idx);
-                idx     = __builtin_ctzll(knights);
-            }
-        }
-
-        {
-            auto bishops = board.black_bishops;
-            auto idx     = __builtin_ctzll(bishops);
-            while (bishops) {
-                auto attacks_to = filter_attack_rays(diagonal_attack_rays(idx, board), board, board.turn);
-                auto idx_attack = __builtin_ctzll(attacks_to);
-                while (attacks_to) {
-                    ret.push_back({idx, idx_attack});
-                    attacks_to = attacks_to &~ (1UL << idx_attack);
-                    idx_attack = __builtin_ctzll(attacks_to);
-                }
-
-                bishops = bishops &~ (1UL << idx);
-                idx     = __builtin_ctzll(bishops);
-            }
-        }
-
-        {
-            auto rooks = board.black_rooks;
-            auto idx     = __builtin_ctzll(rooks);
-            while (rooks) {
-                auto attacks_to = filter_attack_rays(attack_rays_rook(idx, board), board, board.turn);
-                auto idx_attack = __builtin_ctzll(attacks_to);
-                while (attacks_to) {
-                    ret.push_back({idx, idx_attack});
-                    attacks_to = attacks_to &~ (1UL << idx_attack);
-                    idx_attack = __builtin_ctzll(attacks_to);
-                }
-
-                rooks = rooks &~ (1UL << idx);
-                idx     = __builtin_ctzll(rooks);
-            }
-        }
-
-        {
-            auto queens = board.black_queens;
-            auto idx     = __builtin_ctzll(queens);
-            while (queens) {
-                auto attacks_to = filter_attack_rays(attack_rays_queen(idx, board), board, board.turn);
-                auto idx_attack = __builtin_ctzll(attacks_to);
-                while (attacks_to) {
-                    ret.push_back({idx, idx_attack});
-                    attacks_to = attacks_to &~ (1UL << idx_attack);
-                    idx_attack = __builtin_ctzll(attacks_to);
-                }
-
-                queens = queens &~ (1UL << idx);
-                idx     = __builtin_ctzll(queens);
-            }
-        }
-
         {
             auto king = board.black_king;
             auto idx = __builtin_ctzll(king);
