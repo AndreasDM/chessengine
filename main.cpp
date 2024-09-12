@@ -3114,6 +3114,16 @@ TEST_CASE("fen parser")
     auto board = parse_fen(fen);
 }
 
+TEST_CASE("Finds checkmate: rnb1k1nr/pppp1ppp/5q2/2b1p3/2B1P3/2N5/PPPP1PPP/R1BQK1NR w KQkq - 4 4 moves d2d3")
+{
+    std::string fen = "rnb1k1nr/pppp1ppp/5q2/2b1p3/2B1P3/2N5/PPPP1PPP/R1BQK1NR w KQkq - 4 4";
+    auto board = parse_fen(fen);
+    board = make_move({d2,d3}, board);
+    auto move = think(board, 4);
+    CHECK_THAT(square_to_str[move.from], Catch::Equals("f6"));
+    CHECK_THAT(square_to_str[move.to], Catch::Equals("f2"));
+}
+
 #endif
 
 
@@ -3145,6 +3155,29 @@ BENCHMARK_MAIN();
 
 #if !defined(TESTS) && !defined(BENCH)
 
+Board parse_and_move(Board board, std::string const & to_move)
+{
+    int from = move_key[to_move.substr(0, 2)];
+    int to   = move_key[to_move.substr(2, 2)];
+
+    char promo = 'q';
+    if (to_move.length() == 5) {
+        promo = to_move.substr(4, 1)[0];
+    }
+
+    int prom = Promo_none;
+    if (promo == 'q')
+        prom = Promo_queen;
+    if (promo == 'r')
+        prom = Promo_rook;
+    if (promo == 'b')
+        prom = Promo_bishop;
+    if (promo == 'n')
+        prom = Promo_knight;
+
+    return make_move({print_mapping[from], print_mapping[to], prom}, board);
+}
+
 int main()
 {
     bool running = true;
@@ -3173,39 +3206,32 @@ int main()
                     board = start_position();
                     if (iss >> in && in.compare("moves") == 0) {
                         std::string to_move;
-                        while (iss >> to_move) {
-                            int from = move_key[to_move.substr(0, 2)];
-                            int to   = move_key[to_move.substr(2, 2)];
-
-                            char promo = 'q';
-                            if (to_move.length() == 5) {
-                                promo = to_move.substr(4, 1)[0];
-                            }
-
-                            int prom = Promo_none;
-                            if (promo == 'q')
-                                prom = Promo_queen;
-                            if (promo == 'r')
-                                prom = Promo_rook;
-                            if (promo == 'b')
-                                prom = Promo_bishop;
-                            if (promo == 'n')
-                                prom = Promo_knight;
-
-                            board = make_move({print_mapping[from], print_mapping[to], prom}, board);
-                        }
+                        while (iss >> to_move)
+                            board = parse_and_move(board, to_move);
                     }
+                } else if (in.compare("fen") == 0) {
+                    std::string fen;
+                    std::string to_move;
+                    {
+                        char empty;
+                        iss >> std::noskipws >> empty;
+                    }
+                    for (char c; iss >> std::noskipws >> c && c != 'm';)
+                        fen.push_back(c);
+                    board = parse_fen(fen);
+                    iss >> to_move;
+                    while (iss >> std::skipws >> to_move)
+                        board = parse_and_move(board, to_move);
                 }
             }
         } else if (in.compare("go") == 0) {
-            best_move = think(board, 5);
+            best_move = think(board, 4);
             fmt::print("bestmove {}{}\n", square_to_str[best_move.from], square_to_str[best_move.to]);
         } else if (in.compare("stop") == 0) {
             fmt::print("bestmove {}{}\n", square_to_str[best_move.from], square_to_str[best_move.to]);
         } else if (in.compare("print") == 0) {
             print_board(board);
         }
-
     }
 
     return 0;
