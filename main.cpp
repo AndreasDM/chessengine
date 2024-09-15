@@ -3,6 +3,7 @@
 #include <iomanip>
 #include <bitset>
 #include <array>
+#include <limits>
 #include <string>
 #include <map>
 #include <vector>
@@ -664,6 +665,27 @@ struct Move {
 
 enum Piece_type {
     None, Pawn, Knight, Bishop, Rook, Queen, King
+};
+
+// mvvlva[victim][attacker]
+// Victim   None  Pawn  Knight  Bishop  Rook  Queen  King
+// Attacker
+// None      0     0      0       0      0      0      0
+// Pawn      0    105    205     305    405    505    605
+// Knight    0    104    204     304    404    504    604
+// Bishop    0    103    203     303    403    503    603
+// Rook      0    102    202     302    402    502    602
+// Queen     0    101    201     301    401    501    601
+// King      0    100    200     300    400    500    600
+constexpr int mvvlva[7][7]
+{
+    {0,   0,   0,   0,   0,   0,   0 },
+    {0, 105, 205, 305, 405, 505, 605 },
+    {0, 104, 204, 304, 404, 504, 604 },
+    {0, 103, 203, 303, 403, 503, 603 },
+    {0, 102, 202, 302, 402, 502, 602 },
+    {0, 101, 201, 301, 401, 501, 601 },
+    {0, 100, 200, 300, 400, 500, 600 }
 };
 
 const std::string board_str[2][7] = {
@@ -1367,6 +1389,20 @@ constexpr inline auto make_move(Move move, Board board) noexcept
     return updated_board;
 }
 
+constexpr inline bool is_capture(Move move, Board board)
+{
+    return board.turn == Turn::white
+        ? (black_pieces(board) & (1UL << move.to))
+        : (white_pieces(board) & (1UL << move.to));
+}
+
+constexpr inline bool is_check(Move move, Board board)
+{
+    return is_in_check(make_move(move, board));
+}
+
+constexpr inline bool is_checkmate(Move move, Board board);
+
 struct MoveList {
     constexpr std::array<Move, 256>::iterator begin() noexcept
     {
@@ -1386,6 +1422,18 @@ struct MoveList {
     constexpr size_t size()
     {
         return i;
+    }
+
+    void sort(Board board)
+    {
+        std::sort(begin(), end(), [&](auto & a, auto & b) {
+            auto a_from = piece_type_on_idx(board, a.from);
+            auto a_to   = piece_type_on_idx(board, a.to);
+            auto b_from = piece_type_on_idx(board, b.from);
+            auto b_to   = piece_type_on_idx(board, b.to);
+
+            return mvvlva[a_from][a_to] > mvvlva[b_from][b_to];
+        });
     }
 
     size_t i{};
@@ -1706,6 +1754,22 @@ MoveList generate_moves(const Board & board) noexcept
     return ret;
 }
 
+constexpr inline bool is_checkmate(Move move, Board board)
+{
+    auto x = make_move(move, board);
+    if (is_in_check(x)) {
+        auto moves = generate_moves(x);
+        auto has_moves = false;
+        for (auto m : moves) {
+            if (auto y = make_move(m, x); !is_in_check_turn(y, x.turn))
+                has_moves = true;
+        }
+
+        return !has_moves;
+    }
+
+    return false;
+}
 
 std::array<const char*, 64> square_to_str {
     "a1", "a2", "a3", "a4","a5","a6","a7","a8",
@@ -1893,7 +1957,7 @@ Board parse_fen(std::string fen)
 
 constexpr inline auto evaluation(Board board)
 {
-    auto material = 9500 * (__builtin_popcountll(board.white_king) - __builtin_popcountll(board.black_king))
+    auto material = 500 * (__builtin_popcountll(board.white_king) - __builtin_popcountll(board.black_king))
                   + 900 * (__builtin_popcountll(board.white_queens) - __builtin_popcountll(board.black_queens))
                   + 500 * (__builtin_popcountll(board.white_rooks) - __builtin_popcountll(board.black_rooks))
                   + 300 * (__builtin_popcountll(board.white_bishops) - __builtin_popcountll(board.black_bishops))
@@ -2005,6 +2069,156 @@ Move think(Board board, int depth)
     }
 
     return m;
+}
+
+int negamax2(int depth, Board board, int alpha, int beta)
+{
+    if (depth == 0)
+        return evaluation(board);
+
+    // auto value     = std::numeric_limits<int>::min();
+    auto moves     = generate_moves(board);
+    auto has_moves = false;
+
+    moves.sort(board);
+
+    for (auto move : moves) {
+        if (auto foo = make_move(move, board); !is_in_check_turn(foo, board.turn)) {
+            has_moves = true;
+            int value = -negamax2(depth - 1, foo, -beta, -alpha);
+
+            if (value >= beta)
+                return beta;
+
+            if (value > alpha)
+                alpha = value;
+        }
+    }
+
+    if (!has_moves) {
+        if (is_in_check(board))
+            return -49000;
+        else
+            return 0;
+    }
+
+    return alpha;
+}
+
+size_t nodes = 0;
+int think_score = 0;
+
+int quiescence(Board board, int alpha, int beta) noexcept
+{
+    ++nodes;
+
+    int eval = evaluation(board);
+
+    if (eval >= beta)
+        return beta;
+
+    if (eval > alpha)
+        alpha = eval;
+
+    auto moves = generate_moves(board);
+    moves.sort(board);
+
+    for (auto move : moves) {
+        if (is_capture(move, board)) {
+            // Make sure we are not in check after making a move
+            if (auto x = make_move(move, board); !is_in_check_turn(x, board.turn)) {
+
+                int score = -quiescence(x, -beta, -alpha);
+
+                if (score > alpha) {
+                    alpha = score;
+                }
+
+                if (score >= beta)
+                    return score;
+            }
+        }
+    }
+
+    return alpha;
+}
+
+int negamax3(int depth, Board board, int alpha, int beta, Move & bestmove) noexcept
+{
+    if (depth == 0)
+        return quiescence(board, alpha, beta);
+
+    ++nodes;
+
+    auto moves = generate_moves(board);
+    auto bestmove_so_far = Move{};
+    auto old_alpha = alpha;
+    moves.sort(board);
+    bool has_moves = false;
+    int score{};
+
+    for (auto move : moves) {
+        if (auto x = make_move(move, board); !is_in_check_turn(x, board.turn)) {
+            has_moves = true;
+            score = -negamax3(depth - 1, x, -beta, -alpha, bestmove);
+
+            if (score > alpha) {
+                alpha = score;
+                bestmove_so_far = move;
+            }
+
+            if (score >= beta)
+                return beta;
+        }
+    }
+
+    if (!has_moves) {
+        if (is_in_check(board))
+            return -49000;
+        else
+            return 0;
+    }
+
+    if (alpha != old_alpha)
+        bestmove = bestmove_so_far;
+
+    return alpha;
+}
+
+inline Move think3(Board board, int depth) noexcept
+{
+    Move bestmove;
+    nodes = 0;
+    think_score = negamax3(depth, board, -50000, 50000, bestmove);
+
+    return bestmove;
+}
+
+// With alpha beta pruning
+Move think2(Board board, int depth)
+{
+    auto moves     = generate_moves(board);
+    moves.sort(board);
+
+    auto best_move = Move{};
+    auto alpha     = -50000;
+    auto beta      = 50000;
+
+    for (auto move : moves) {
+        if (auto foo = make_move(move, board); !is_in_check_turn(foo, board.turn)) {
+            auto score = -negamax2(depth - 1, board, -beta, -alpha);
+
+            if (score >= beta)
+                break;
+
+            if (score > alpha) {
+                best_move = move;
+                alpha     = score;
+            }
+        }
+    }
+
+    return best_move;
 }
 
 #if TESTS
@@ -3127,6 +3341,34 @@ TEST_CASE("Finds checkmate: rnb1k1nr/pppp1ppp/5q2/2b1p3/2B1P3/2N5/PPPP1PPP/R1BQK
     CHECK_THAT(square_to_str[move.to], Catch::Equals("f2"));
 }
 
+TEST_CASE("Finds checkmate with think3")
+{
+    std::string fen = "rnb1k1nr/pppp1ppp/5q2/2b1p3/2B1P3/2N5/PPPP1PPP/R1BQK1NR w KQkq - 4 4";
+    auto board = parse_fen(fen);
+    board = make_move({d2,d3}, board);
+    auto move = think3(board, 2);
+    CHECK_THAT(square_to_str[move.from], Catch::Equals("f6"));
+    CHECK_THAT(square_to_str[move.to], Catch::Equals("f2"));
+}
+
+TEST_CASE("Qf6f2 is checkmate")
+{
+    std::string fen = "rnb1k1nr/pppp1ppp/5q2/2b1p3/2B1P3/2N5/PPPP1PPP/R1BQK1NR w KQkq - 4 4";
+    auto board = parse_fen(fen);
+    board = make_move({d2,d3}, board);
+
+    CHECK(is_checkmate({f6,f2}, board));
+}
+
+TEST_CASE("Bc5f2 is NOT checkmate")
+{
+    std::string fen = "rnb1k1nr/pppp1ppp/5q2/2b1p3/2B1P3/2N5/PPPP1PPP/R1BQK1NR w KQkq - 4 4";
+    auto board = parse_fen(fen);
+    board = make_move({d2,d3}, board);
+
+    CHECK(!is_checkmate({c5,f2}, board));
+}
+
 TEST_CASE("perft4_kiwipete", "[.]")
 {
     std::string fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq";
@@ -3149,6 +3391,72 @@ TEST_CASE("perft6_kiwipete", "[.]")
     auto board = parse_fen(fen);
 
     CHECK(perft(6, board, 6) == 8031647685);
+}
+
+TEST_CASE("Nxd5 is capture")
+{
+    auto board = parse_fen("rnbqkb1r/ppp1pppp/5n2/3p4/3P4/2N5/PPP1PPPP/R1BQKBNR w KQkq - 2 3");
+    CHECK(is_capture({c3,d5}, board));
+}
+
+TEST_CASE("Nxd5 is the first move after sort")
+{
+    auto board = parse_fen("rnbqkb1r/ppp1pppp/5n2/3p4/3P4/2N5/PPP1PPPP/R1BQKBNR w KQkq - 2 3");
+    auto moves = generate_moves(board);
+    moves.sort(board);
+
+    CHECK(moves.list[0].from == c3);
+    CHECK(moves.list[0].to == d5);
+}
+
+TEST_CASE("Bf4 is NOT capture")
+{
+    auto board = parse_fen("rnbqkb1r/ppp1pppp/5n2/3p4/3P4/2N5/PPP1PPPP/R1BQKBNR w KQkq - 2 3");
+    CHECK(!is_capture({c1,f4}, board));
+}
+
+TEST_CASE("Nc7 -> is check")
+{
+    auto board = parse_fen("rnbqkb1r/ppp1ppp1/5n1p/1N1p4/3P4/8/PPP1PPPP/R1BQKBNR w KQkq - 0 4");
+    CHECK(is_check({b5,c7}, board));
+}
+
+TEST_CASE("Qd3 -> is NOT check")
+{
+    auto board = parse_fen("rnbqkb1r/ppp1ppp1/5n1p/1N1p4/3P4/8/PPP1PPPP/R1BQKBNR w KQkq - 0 4");
+    CHECK(!is_check({d1,d3}, board));
+}
+
+TEST_CASE("MVV-LVA")
+{
+    CHECK(mvvlva[Pawn][Pawn] == 105);
+    CHECK(mvvlva[Pawn][Knight] == 205);
+    CHECK(mvvlva[Pawn][Bishop] == 305);
+    CHECK(mvvlva[Pawn][Rook] == 405);
+    CHECK(mvvlva[Pawn][Queen] == 505);
+    CHECK(mvvlva[Pawn][King] == 605);
+
+    CHECK(mvvlva[Knight][Pawn] == 104);
+    CHECK(mvvlva[Knight][Knight] == 204);
+    CHECK(mvvlva[Knight][Bishop] == 304);
+    CHECK(mvvlva[Knight][Rook] == 404);
+    CHECK(mvvlva[Knight][Queen] == 504);
+    CHECK(mvvlva[Knight][King] == 604);
+
+    CHECK(mvvlva[None][None] == 0);
+    CHECK(mvvlva[None][Pawn] == 0);
+    CHECK(mvvlva[None][Knight] == 0);
+    CHECK(mvvlva[None][Bishop] == 0);
+    CHECK(mvvlva[None][Rook] == 0);
+    CHECK(mvvlva[None][Queen] == 0);
+    CHECK(mvvlva[None][King] == 0);
+
+    CHECK(mvvlva[Pawn][None] == 0);
+    CHECK(mvvlva[Knight][None] == 0);
+    CHECK(mvvlva[Bishop][None] == 0);
+    CHECK(mvvlva[Rook][None] == 0);
+    CHECK(mvvlva[Queen][None] == 0);
+    CHECK(mvvlva[King][None] == 0);
 }
 
 #endif
@@ -3175,8 +3483,52 @@ static void perft5_kiwipete(benchmark::State & state)
     }
 }
 
+static void negamax_depth_4(benchmark::State & state)
+{
+    std::string fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq";
+    auto board      = parse_fen(fen);
+
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(think(board, 4));
+    }
+}
+
+static void negamax2_depth_4(benchmark::State & state)
+{
+    std::string fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq";
+    auto board      = parse_fen(fen);
+
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(think2(board, 4));
+    }
+}
+
+static void negamax3_depth_4(benchmark::State & state)
+{
+    std::string fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq";
+    auto board      = parse_fen(fen);
+
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(think3(board, 4));
+    }
+}
+
+static void negamax_kiwipete_depth_5(benchmark::State & state)
+{
+    std::string fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq";
+    auto board = parse_fen(fen);
+
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(think3(board, 5));
+    }
+}
+
 BENCHMARK(perft4_kiwipete)->Unit(benchmark::kMillisecond);
 BENCHMARK(perft5_kiwipete)->Unit(benchmark::kSecond);
+BENCHMARK(negamax_depth_4)->Unit(benchmark::kMillisecond);
+BENCHMARK(negamax2_depth_4)->Unit(benchmark::kMillisecond);
+BENCHMARK(negamax3_depth_4)->Unit(benchmark::kMillisecond);
+BENCHMARK(negamax_kiwipete_depth_5)->Unit(benchmark::kMillisecond);
 BENCHMARK_MAIN();
 #endif
 
@@ -3252,8 +3604,13 @@ int main()
                 }
             }
         } else if (in.compare("go") == 0) {
-            best_move = think(board, 4);
-            fmt::print("bestmove {}{}\n", square_to_str[best_move.from], square_to_str[best_move.to]);
+            if (iss >> in && in.compare("depth") == 0) {
+                int depth;
+                iss >> depth;
+                best_move = think3(board, depth);
+                fmt::print("info score cp {} depth {} nodes {}\n", think_score, depth, nodes);
+                fmt::print("bestmove {}{}\n", square_to_str[best_move.from], square_to_str[best_move.to]);
+            }
         } else if (in.compare("stop") == 0) {
             fmt::print("bestmove {}{}\n", square_to_str[best_move.from], square_to_str[best_move.to]);
         } else if (in.compare("print") == 0) {
